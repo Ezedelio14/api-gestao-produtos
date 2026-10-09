@@ -1,0 +1,141 @@
+// ==========================================
+// CONFIGURAÇÕES BASE
+// ==========================================
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ==========================================
+// ENUMS (Tipos definidos)
+// ==========================================
+enum Role {
+  SUPERADMIN
+  ADMIN
+  MANAGER
+  USER
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  CANCELLED
+}
+
+enum MovementType {
+  IN
+  OUT
+}
+
+// ==========================================
+// MODELOS (Tabelas do Banco de Dados)
+// ==========================================
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  avatar    String?  @db.Text   // <--- ADICIONE ESTA LINHA
+  role      Role     @default(USER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt 
+
+  orders         Order[]
+  stockMovements StockMovement[]
+}
+
+model Supplier {
+  id        String   @id @default(uuid())
+  name      String
+  email     String?  @unique
+  phone     String?
+  document  String?  @unique // NIF, CNPJ ou BI
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  products       Product[]
+  stockMovements StockMovement[]
+}
+
+model Category {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  // O default(now()) previne erros ao adicionar o campo em tabelas já preenchidas
+  updatedAt DateTime @default(now()) @updatedAt
+
+  products Product[]
+}
+
+model Product {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  price       Float
+  stock       Int      @default(0)
+  avatar      String?  @db.Text
+  
+  categoryId  String
+  category    Category @relation(fields: [categoryId], references: [id])
+  
+  supplierId  String?
+  supplier    Supplier? @relation(fields: [supplierId], references: [id])
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  orderItems     OrderItem[]
+  stockMovements StockMovement[]
+}
+
+model Order {
+  id        String      @id @default(uuid())
+  userId    String
+  user      User        @relation(fields: [userId], references: [id])
+  
+  total     Float
+  status    OrderStatus @default(PENDING)
+  
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  items OrderItem[]
+}
+
+model OrderItem {
+  id        String  @id @default(uuid())
+  
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  
+  quantity  Int
+  unitPrice Float
+}
+
+model StockMovement {
+  id          String       @id @default(uuid())
+  
+  productId   String
+  product     Product      @relation(fields: [productId], references: [id])
+  
+  userId      String
+  user        User         @relation(fields: [userId], references: [id])
+  
+  supplierId  String?
+  supplier    Supplier?    @relation(fields: [supplierId], references: [id])
+  
+  type        MovementType
+  quantity    Int
+  reason      String?      // Justificação (Ex: Compra, Venda, Avaria)
+  
+  createdAt   DateTime     @default(now())
+}
